@@ -1,0 +1,16 @@
+From: iStoreOS build fix
+Subject: [PATCH] regulator: fixed: remove unused local variable
+
+The preceding regulator patch returns dev_err_probe() directly, leaving
+the local ret variable unused when CONFIG_WERROR is enabled.
+
+--- a/drivers/regulator/fixed.c
++++ b/drivers/regulator/fixed.c
+@@ -179,7 +179,6 @@ static int reg_fixed_voltage_probe(struct platform_device *pdev)
+ 	struct fixed_dev_type *drvtype = of_device_get_match_data(dev);
+ 	struct regulator_config cfg = { };
+ 	enum gpiod_flags gflags;
+-	int ret;
+ 
+ 	drvdata = devm_kzalloc(&pdev->dev, sizeof(struct fixed_voltage_data),
+ 			       GFP_KERNEL);

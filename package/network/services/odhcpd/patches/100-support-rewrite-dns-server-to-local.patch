@@ -1,0 +1,33 @@
+From 0143a1ea9a6d72288842b1a90508550236662640 Mon Sep 17 00:00:00 2001
+From: jjm2473 <jjm2473@gmail.com>
+Date: Wed, 30 Apr 2025 18:38:41 +0800
+Subject: [PATCH] odhcpd: support rewrite dns server to local ipv6 address
+
+(cherry picked from commit f617a849951cb937bae086f1522e08480c899c3b)
+---
+ src/dhcpv6.c | 2 +-
+ src/router.c | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+--- a/src/dhcpv6.c
++++ b/src/dhcpv6.c
+@@ -858,7 +858,7 @@ static void relay_server_response(uint8_
+ 	}
+ 
+ 	/* Rewrite DNS servers if requested */
+-	if (iface->always_rewrite_dns && dns_ptr && dns_count > 0) {
++	if ((iface->always_rewrite_dns || iface->dns_service) && dns_ptr && dns_count > 0) {
+ 		if (is_authenticated)
+ 			return; /* Impossible to rewrite */
+ 
+--- a/src/router.c
++++ b/src/router.c
+@@ -1162,7 +1162,7 @@ static void forward_router_advertisement
+ 			odhcpd_get_mac(c, mac_ptr);
+ 
+ 		/* If we have to rewrite DNS entries */
+-		if (c->always_rewrite_dns && dns_ptr && dns_count > 0) {
++		if ((c->always_rewrite_dns || c->dns_service) && dns_ptr && dns_count > 0) {
+ 			const struct in6_addr *rewrite = c->dns;
+ 			struct in6_addr addr;
+ 			size_t rewrite_cnt = c->dns_cnt;
