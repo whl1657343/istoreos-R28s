@@ -11,6 +11,7 @@
 #include <dt-bindings/leds/common.h>
 #include <dt-bindings/pwm/pwm.h>
 #include "rk3528.dtsi"
+#include "rk3528-patch.dtsi"
 
 / {
 	model = "FriendlyElec NanoPi R28S";
@@ -18,6 +19,7 @@
 
 	aliases {
 		ethernet0 = &gmac1;
+		ethernet1 = &r8111h;
 		i2c1 = &i2c1;
 		mmc0 = &sdhci;
 		mmc1 = &sdmmc;
@@ -58,7 +60,7 @@
 	leds {
 		compatible = "gpio-leds";
 		pinctrl-names = "default";
-		pinctrl-0 = <&lan_led_g>, <&sys_led_g>, <&wan_led_g>;
+		pinctrl-0 = <&lan_led_g>, <&sys_led_g>;
 
 		led-lan {
 			color = <LED_COLOR_ID_GREEN>;
@@ -76,13 +78,6 @@
 			linux,default-trigger = "heartbeat";
 		};
 
-		led-wan {
-			color = <LED_COLOR_ID_GREEN>;
-			default-state = "off";
-			function = LED_FUNCTION_WAN;
-			gpios = <&gpio4 RK_PC0 GPIO_ACTIVE_HIGH>;
-			linux,default-trigger = "netdev";
-		};
 	};
 
 	vdd_0v9: regulator-0v9-vdd {
@@ -225,6 +220,32 @@
 	};
 };
 
+&pcie2x1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pciem1_pins>;
+	reset-gpios = <&gpio4 RK_PC0 GPIO_ACTIVE_HIGH>;
+	resets = <&cru SRST_PCIE_POWER_UP>, <&cru SRST_P_PCIE>;
+	reset-names = "pcie", "periph";
+	rockchip,skip-scan-in-resume;
+	rockchip,skip-hw-retry;
+	status = "okay";
+
+	pcie@0,0 {
+		reg = <0x00000000 0 0 0 0>;
+		#address-cells = <3>;
+		#size-cells = <2>;
+
+		r8111h: pcie@0,0 {
+			reg = <0x000000 0 0 0 0>;
+			local-mac-address = [ 00 00 00 00 00 00 ];
+		};
+	};
+};
+
+&combphy_pu {
+	status = "okay";
+};
+
 &pinctrl {
 	ethernet {
 		gmac1_rstn_l: gmac1-rstn-l {
@@ -247,9 +268,6 @@
 			rockchip,pins = <4 RK_PC1 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
 
-		wan_led_g: wan-led-g {
-			rockchip,pins = <4 RK_PC0 RK_FUNC_GPIO &pcfg_pull_none>;
-		};
 	};
 
 	sdmmc {

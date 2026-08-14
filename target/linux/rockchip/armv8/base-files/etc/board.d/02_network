@@ -39,9 +39,11 @@ rockchip_setup_interfaces()
 	hlink,h28k|\
 	radxa,e20c|\
 	radxa,e25|\
-	friendlyelec,nanopi-r28s|\
 	radxa,rock-3b)
 		ucidef_set_interfaces_lan_wan 'eth0' 'eth1'
+		;;
+	friendlyelec,nanopi-r28s)
+		ucidef_set_interfaces_lan_wan 'eth1' 'eth0'
 		;;
 	hinlink,h88k-v3|\
 	hinlink,opc-h69k|\

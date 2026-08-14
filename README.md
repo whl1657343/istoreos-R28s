@@ -1,117 +1,91 @@
-iStoreOS 是入门级的路由系统，也是入门级的 NAS 系统，
-基于原版 OpenWRT，在 ARS2 上经过长期迭代，最终开放适配到多个硬件平台
+# iStoreOS for NanoPi R28S
 
-更多信息请参阅 https://github.com/istoreos
+本仓库已适配 FriendlyElec NanoPi R28S（RK3528A），用于构建可从 SD 卡启动的 iStoreOS 镜像。
 
+## 版本与默认配置
 
-以下是 OpenWRT 原始的 README
---------
+| 项目 | 当前配置 |
+| --- | --- |
+| 系统 | iStoreOS 24.10.8（基于 OpenWrt 24.10.8） |
+| 内核 | Linux 6.6.144 |
+| 目标平台 | rockchip/armv8（aarch64_generic，musl） |
+| 设备 | FriendlyElec NanoPi R28S / RK3528A |
+| 管理地址 | `http://192.168.100.1` |
+| 登录用户名 | `root` |
+| 默认密码 | 空密码（密码栏留空） |
 
-![OpenWrt logo](include/logo.png)
+首次登录后请立即在“系统 → 管理权”中设置 root 密码。
 
-OpenWrt Project is a Linux operating system targeting embedded devices. Instead
-of trying to create a single, static firmware, OpenWrt provides a fully
-writable filesystem with package management. This frees you from the
-application selection and configuration provided by the vendor and allows you
-to customize the device through the use of packages to suit any application.
-For developers, OpenWrt is the framework to build an application without having
-to build a complete firmware around it; for users this means the ability for
-full customization, to use the device in ways never envisioned.
+## 网络接口
 
-Sunshine!
+| 设备丝印网口 | Linux 接口 | 默认角色 | 默认设置 |
+| --- | --- | --- | --- |
+| 网口 1 | `eth0` | WAN | DHCP 客户端 |
+| 网口 2 | `eth1` | LAN | `192.168.100.1/24`，DHCP 服务器 |
 
-## Download
+LAN 的 DHCP 地址池为 `192.168.100.100` 到 `192.168.100.249`。电脑接入网口 2 后应设置为“自动获得 IPv4 地址”；获取地址后访问 `http://192.168.100.1`。
 
-Built firmware images are available for many architectures and come with a
-package selection to be used as WiFi home router. To quickly find a factory
-image usable to migrate from a vendor stock firmware to OpenWrt, try the
-*Firmware Selector*.
+## Ubuntu / WSL 编译环境
 
-* [OpenWrt Firmware Selector](https://firmware-selector.openwrt.org/)
+请在 Ubuntu 原生 Linux 文件系统中编译，例如 WSL 的 `/home/toor/r28s`。不要把源码放在 `/mnt/c` 等 Windows 挂载目录，避免大小写、符号链接和 I/O 性能问题。
 
-If your device is supported, please follow the **Info** link to see install
-instructions or consult the support resources listed below.
+安装依赖：
 
-## 
-
-An advanced user may require additional or specific package. (Toolchain, SDK, ...) For everything else than simple firmware download, try the wiki download page:
-
-* [OpenWrt Wiki Download](https://openwrt.org/downloads)
-
-## Development
-
-To build your own firmware you need a GNU/Linux, BSD or macOS system (case
-sensitive filesystem required). Cygwin is unsupported because of the lack of a
-case sensitive file system.
-
-### Requirements
-
-You need the following tools to compile OpenWrt, the package names vary between
-distributions. A complete list with distribution specific packages is found in
-the [Build System Setup](https://openwrt.org/docs/guide-developer/build-system/install-buildsystem)
-documentation.
-
-```
-binutils bzip2 diff find flex gawk gcc-6+ getopt grep install libc-dev libz-dev
-make4.1+ perl python3.7+ rsync subversion unzip which
+```sh
+sudo apt update
+sudo apt install -y build-essential clang flex bison g++ gawk gcc-multilib \
+  g++-multilib gettext git libncurses5-dev libssl-dev python3-setuptools \
+  rsync swig unzip zlib1g-dev file wget
 ```
 
-### Quickstart
+进入源码目录并初始化 feeds：
 
-1. Run `./scripts/feeds update -a` to obtain all the latest package definitions
-   defined in feeds.conf / feeds.conf.default
+```sh
+cd /home/toor/r28s
+./scripts/feeds update -a
+./scripts/feeds install -a
+```
 
-2. Run `./scripts/feeds install -a` to install symlinks for all obtained
-   packages into package/feeds/
+本仓库中的 `.config` 已选择 R28S。若 `.config` 被删除或需要重新选择目标，执行：
 
-3. Run `make menuconfig` to select your preferred configuration for the
-   toolchain, target system & firmware packages.
+```sh
+make menuconfig
+```
 
-4. Run `make` to build your firmware. This will download all sources, build the
-   cross-compile toolchain and then cross-compile the GNU/Linux kernel & all chosen
-   applications for your target system.
+在菜单中选择：
 
-### Related Repositories
+```text
+Target System      → Rockchip
+Subtarget          → ARMv8 boards (64 bit)
+Target Profile     → FriendlyARM NanoPi R28S
+```
 
-The main repository uses multiple sub-repositories to manage packages of
-different categories. All packages are installed via the OpenWrt package
-manager called `opkg`. If you're looking to develop the web interface or port
-packages to OpenWrt, please find the fitting repository below.
+保存后执行：
 
-* [LuCI Web Interface](https://github.com/openwrt/luci): Modern and modular
-  interface to control the device via a web browser.
+```sh
+make defconfig
+make download -j16
+make -j16 V=s
+```
 
-* [OpenWrt Packages](https://github.com/openwrt/packages): Community repository
-  of ported packages.
+`-j16` 适合 16 线程 CPU；内存不足、构建异常或需要更稳定的日志时，改用 `make -j1 V=s`。首次全量构建需要下载工具链和源码，耗时通常较长。
 
-* [OpenWrt Routing](https://github.com/openwrt/routing): Packages specifically
-  focused on (mesh) routing.
+## 构建产物与刷写
 
-* [OpenWrt Video](https://github.com/openwrt/video): Packages specifically
-  focused on display servers and clients (Xorg and Wayland).
+完成后，SD 卡镜像位于：
 
-## Support Information
+```text
+bin/targets/rockchip/armv8/istoreos-rockchip-armv8-friendlyarm_nanopi-r28s-squashfs-sysupgrade.img.gz
+```
 
-For a list of supported devices see the [OpenWrt Hardware Database](https://openwrt.org/supported_devices)
+将该 `.img.gz` 解压为 `.img`，使用 Balena Etcher、Rufus 或其他镜像写入工具写入 SD 卡的整个磁盘设备。写入完成后安全弹出 SD 卡，再插入 R28S 上电启动。
 
-### Documentation
+## 注意事项
 
-* [Quick Start Guide](https://openwrt.org/docs/guide-quick-start/start)
-* [User Guide](https://openwrt.org/docs/guide-user/start)
-* [Developer Documentation](https://openwrt.org/docs/guide-developer/start)
-* [Technical Reference](https://openwrt.org/docs/techref/start)
-
-### Support Community
-
-* [Forum](https://forum.openwrt.org): For usage, projects, discussions and hardware advise.
-* [Support Chat](https://webchat.oftc.net/#openwrt): Channel `#openwrt` on **oftc.net**.
-
-### Developer Community
-
-* [Bug Reports](https://bugs.openwrt.org): Report bugs in OpenWrt
-* [Dev Mailing List](https://lists.openwrt.org/mailman/listinfo/openwrt-devel): Send patches
-* [Dev Chat](https://webchat.oftc.net/#openwrt-devel): Channel `#openwrt-devel` on **oftc.net**.
-
-## License
-
-OpenWrt is licensed under GPL-2.0
+- 此镜像是 SD 卡启动镜像，不要把它当作普通 `.ipk` 或仅复制到 SD 卡文件系统中。
+- 首次启动约需数分钟；启动完成后，LAN 口会提供 DHCP 服务。
+- 如果电脑没有获取到地址，先确认连接的是网口 2，再关闭并重新启用电脑网卡，或重新插拔网线以触发 DHCP 请求。
+- 串口参数为 `1500000 8N1`。Windows 下可使用 COM 端口连接串口控制台。
+- WAN（网口 1）默认使用 DHCP 获取上级网络地址；LAN（网口 2）用于本地管理。
+- 编译失败时保留完整日志，优先使用 `make -j1 V=s` 重现首个报错；不要只依据最后几行的 `Error 2` 判断根因。
+- 若修改了内核、设备树或镜像分区相关文件，建议执行 `make target/linux/clean` 后再重新构建目标镜像。
