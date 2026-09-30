@@ -26,6 +26,16 @@ jobs:
         uses: actions/checkout@v4
 
       # ------------------------------------------------------
+      # 0. 修复脚本执行权限（Windows 提交常丢失可执行位，会导致
+      #    ./scripts/feeds 权限被拒 exit 126，必须在编译前补齐）
+      # ------------------------------------------------------
+      - name: Fix script permissions
+        run: |
+          chmod +x scripts/feeds
+          find scripts -type f \( -name '*.sh' -o -name 'feeds' \) -exec chmod +x {} \; 2>/dev/null || true
+          ls -l scripts/feeds
+
+      # ------------------------------------------------------
       # 1. 安装 OpenWrt/iStoreOS 编译依赖（与仓库 README 一致）
       # ------------------------------------------------------
       - name: Install build dependencies
