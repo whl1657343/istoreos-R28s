@@ -1,0 +1,104 @@
+# ============================================================
+#  iStoreOS for NanoPi R28S — GitHub Actions 云端构建工作流
+#  适用仓库：github.com/2kil/istoreos-R28s（根目录 iStoreOS 源码树）
+#  目标设备：FriendlyARM NanoPi R28S（RK3528A）
+#  产物：istoreos-rockchip-armv8-friendlyarm_nanopi-r28s-squashfs-sysupgrade.img.gz
+#  用法：把本文件放到 fork 后仓库的  .github/workflows/ 目录下提交，
+#        然后到该仓库 Actions 页手动 Run workflow。
+# ============================================================
+
+name: Build iStoreOS for NanoPi R28S
+
+# 触发方式：手动运行（推荐）+ 给仓库加星触发（可选）
+on:
+  workflow_dispatch:
+  watch:
+    types: started
+
+jobs:
+  build-istoreos-r28s:
+    runs-on: ubuntu-22.04
+    # 加星触发时，只允许仓库所有者本人 star 才执行（防止陌生人 star 触发）
+    if: github.event_name != 'watch' || github.event.repository.owner.id == github.event.sender.id
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      # ------------------------------------------------------
+      # 1. 安装 OpenWrt/iStoreOS 编译依赖（与仓库 README 一致）
+      # ------------------------------------------------------
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential clang flex bison g++ gawk \
+            gcc-multilib g++-multilib gettext git libncurses5-dev libssl-dev \
+            python3 python3-setuptools rsync swig unzip zlib1g-dev file wget \
+            libjson-c-dev libpcap-dev liblzma-dev
+          sudo -E apt-get -y autoremove
+
+      # ------------------------------------------------------
+      # 2. 腾出磁盘空间（GitHub runner 只有约 14GB，必须清理）
+      # ------------------------------------------------------
+      - name: Free disk space
+        run: |
+          sudo swapoff -a || true
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /usr/local/share/boost \
+            /opt/ghc /opt/hostedtoolcache 2>/dev/null || true
+          df -h
+
+      # ------------------------------------------------------
+      # 3. 拉取并安装 feeds（iStoreOS 定制源）
+      # ------------------------------------------------------
+      - name: Update and install feeds
+        run: |
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+
+      # ------------------------------------------------------
+      # 4. 非交互式选择 R28S 目标（等价于 menuconfig：
+      #    Target System→Rockchip / Subtarget→ARMv8 / Profile→FriendlyARM NanoPi R28S）
+      # ------------------------------------------------------
+      - name: Configure target for NanoPi R28S
+        run: |
+          cat > .config <<'EOF'
+          CONFIG_TARGET_rockchip=y
+          CONFIG_TARGET_rockchip_armv8=y
+          CONFIG_TARGET_rockchip_armv8_DEVICE_friendlyarm_nanopi-r28s=y
+          EOF
+          make defconfig
+          echo "---- selected target ----"
+          grep -E 'CONFIG_TARGET_(rockchip|rockchip_armv8|rockchip_armv8_DEVICE)' .config
+
+      # ------------------------------------------------------
+      # 5. 预下载所有软件包源码
+      # ------------------------------------------------------
+      - name: Download package sources
+        run: |
+          make download -j4
+          find dl -size -1024c -exec rm -f {} \;
+
+      # ------------------------------------------------------
+      # 6. 编译（并行失败自动降级为 -j1 单线程，便于稳定出镜像）
+      # ------------------------------------------------------
+      - name: Compile iStoreOS
+        run: |
+          if ! make -j4 V=s; then
+            echo "::warning::parallel build failed, retrying with -j1 V=s"
+            make -j1 V=s
+          fi
+
+      # ------------------------------------------------------
+      # 7. 校验产物并上传（可下载 7 天）
+      # ------------------------------------------------------
+      - name: Verify and upload firmware
+        if: always()
+        run: |
+          ls -lh bin/targets/rockchip/armv8/
+      - name: Upload firmware artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: istoreos-r28s-firmware
+          path: bin/targets/rockchip/armv8/*
+          if-no-files-found: error
