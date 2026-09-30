@@ -31,9 +31,13 @@ jobs:
       # ------------------------------------------------------
       - name: Fix script permissions
         run: |
-          chmod +x scripts/feeds
-          find scripts -type f \( -name '*.sh' -o -name 'feeds' \) -exec chmod +x {} \; 2>/dev/null || true
-          ls -l scripts/feeds
+          # Windows 提交会丢失可执行位，导致 ./scripts/feeds、config.guess、
+          # package-metadata.pl 等权限被拒（exit 126）。scripts 目录全是要
+          # 执行的脚本，整体加执行位；再对全树常见脚本扩展名兜底补齐。
+          chmod -R +x scripts
+          find . -type f \( -name '*.sh' -o -name '*.pl' -o -name '*.py' \
+            -o -name 'config.guess' -o -name 'config.sub' \) -exec chmod +x {} \; 2>/dev/null || true
+          ls -l scripts/feeds scripts/config.guess scripts/package-metadata.pl
 
       # ------------------------------------------------------
       # 1. 安装 OpenWrt/iStoreOS 编译依赖（与仓库 README 一致）
